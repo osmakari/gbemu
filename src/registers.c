@@ -4,8 +4,8 @@
 
 uint16_t _registers[4] = { 0 };
 
-uint16_t SP = 0;
-uint16_t PC = 0;
+uint16_t SP = 0xFFFE;
+uint16_t PC = 0x100;
 
 
 void set_bit (uint8_t *a, uint8_t index, uint8_t state) {
@@ -59,37 +59,6 @@ void print_registers () {
             get_register8(REG_A), get_register8(REG_F), get_register8(REG_B), get_register8(REG_C), 
             get_register8(REG_D), get_register8(REG_E), get_register8(REG_H), get_register8(REG_L));
 }
-
-
-
-// MEMORY
-/*
-Interrupt Enable Register
---------------------------- FFFF
-Internal RAM
---------------------------- FF80
-Empty but unusable for I/O
---------------------------- FF4C
-I/O ports
---------------------------- FF00
-Empty but unusable for I/O
---------------------------- FEA0
-Sprite Attrib Memory (OAM)
---------------------------- FE00
-Echo of 8kB Internal RAM
---------------------------- E000
-8kB Internal RAM
---------------------------- C000
-8kB switchable RAM bank
---------------------------- A000
-8kB Video RAM
---------------------------- 8000 --
-16kB switchable ROM bank          |
---------------------------- 4000  |= 32kB Cartrigbe
-16kB ROM bank #0                  |
---------------------------- 0000 --
-*/
-uint8_t memory[0xFFFF] = { 0 };
 
 
 // Stop mode

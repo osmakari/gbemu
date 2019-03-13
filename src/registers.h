@@ -51,8 +51,4 @@ uint8_t get_register16 (enum L_REGISTER reg);
 
 uint8_t get_flag (enum L_FLAG flag);
 
-
-
-// MEMORY
-
-extern uint8_t memory[0xFFFF];
+void print_registers ();

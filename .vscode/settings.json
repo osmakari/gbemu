@@ -1,5 +1,6 @@
 {
     "files.associations": {
-        "registers.h": "c"
+        "registers.h": "c",
+        "parser.h": "c"
     }
 }

@@ -18,7 +18,8 @@ uint8_t parse_op () {
 
     // 8bit LOAD operations
     if(((m >= 0x40 && m <= 0x7F) && m != 0x76) || 
-        ((m & 0x0F == 0x02 || m & 0x0F == 0x06 || m & 0x0F == 0x0A || m & 0x0F == 0x0E ) && (m >> 4) < 0x3)) {
+        ((m & 0xF == 0x2 || m & 0xF == 0x6 || m & 0xF == 0xA || m & 0xF == 0xE) && m >> 4 <= 3) || 
+        m == 0xE0 || m == 0xF0 || m == 0xE2 || m == 0xF2 || m == 0xEA || m == 0xFA) {
             OP_LD();
             return 1;
     }
@@ -31,7 +32,7 @@ void OP_LD () {
     uint8_t m = memory[PC];
 
     // put value nn into n
-    if(m % 0x8 == 0x6) {
+    if((m >= 0x06 && m <= 0x2E) && (m % 0x8 == 0x6)) {
         PC++;
         switch(m) {
             case 0x6:
@@ -157,6 +158,126 @@ void OP_LD () {
     if(m == 0x36) {
         PC++;
         memory[get_register16(REG_H)] = memory[PC];
+        return;
+    }
+
+    // put value nn into A
+    if((m >= 0x78 && m <= 0x7F) || m == 0x0A || m == 0x1A || m == 0xFA || m == 0x3E) {
+        if(m >= 0x78 && m <= 0x7D) {
+            set_register8(REG_A, get_register8(m - 0x78 + REG_B));
+            return;
+        }
+        switch(m) {
+            case 0x0A:
+            {
+                // (BC) to A
+                set_register8(REG_A, memory[get_register16(REG_B)]);
+                break;
+            }
+            case 0x1A:
+            {
+                // (DE) to A
+                set_register8(REG_A, memory[get_register16(REG_D)]);
+                break;
+            }
+            case 0x7E:
+            {
+                // (HL) to A
+                set_register8(REG_A, memory[get_register16(REG_H)]);
+                break;
+            }
+            case 0xFA:
+            {
+                // (nn) to A(16b) LSB first
+                PC++;
+                uint16_t addr = memory[PC] | (memory[PC+1] << 8);
+                set_register8(REG_A, memory[addr]);
+                PC++;
+                break;
+            }
+            case 0x3E:
+            {
+                // # to A(8b)
+                PC++;
+                set_register8(REG_A, memory[PC]);
+                break;
+            }
+        }
+        return;
+    }
+
+    // put value A into nn
+    if(((m >= 0x47 && m <= 0x7F) && (m % 0x8 == 0x7)) || m == 0x02 || m == 0x12 || m == 0xEA) {
+        switch(m) {
+            case 0x7F:
+            {
+                // A to A
+                break;
+            }
+            case 0x47:
+            {
+                // A to B
+                set_register8(REG_B, get_register8(REG_A));
+                break;
+            }
+            case 0x4F:
+            {
+                // A to C
+                set_register8(REG_C, get_register8(REG_A));
+                break;
+            }
+            case 0x57:
+            {
+                // A to D
+                set_register8(REG_D, get_register8(REG_A));
+                break;
+            }
+            case 0x5F:
+            {
+                // A to E
+                set_register8(REG_E, get_register8(REG_A));
+                break;
+            }
+            case 0x67:
+            {
+                // A to H
+                set_register8(REG_H, get_register8(REG_A));
+                break;
+            }
+            case 0x6F:
+            {
+                // A to L
+                set_register8(REG_L, get_register8(REG_A));
+                break;
+            }
+            case 0x02:
+            {
+                // A to (BC)
+                memory[get_register16(REG_B)] = get_register8(REG_A);
+                break;
+            }
+            case 0x12:
+            {
+                // A to (BC)
+                memory[get_register16(REG_D)] = get_register8(REG_A);
+                break;
+            }
+            case 0x77:
+            {
+                // A to (BC)
+                memory[get_register16(REG_H)] = get_register8(REG_A);
+                break;
+            }
+            case 0xEA:
+            {
+                // A to (nn)(16b) LSB first
+                PC++;
+                uint16_t addr = memory[PC] | (memory[PC+1] << 8);
+                memory[addr] = get_register8(REG_A);
+                PC++;
+                break;
+            }
+        }
         return;
     }
 
