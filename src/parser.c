@@ -1,6 +1,10 @@
 #include "parser.h"
+#include <unistd.h>
+
 
 void OP_LD8 ();
+void OP_LD16 ();
+
 uint8_t _half_carry (uint16_t a, uint16_t b);
 uint8_t _carry16 (uint16_t a, uint16_t b);
 
@@ -425,14 +429,14 @@ void OP_LD8 () {
 
     // Put value at address HL into A, Dec HL
     if(m == 0x3A) {
-        set_register(REG_A, memory_read8(get_register16(REG_H)));
+        set_register8(REG_A, memory_read8(get_register16(REG_H)));
         set_register16(REG_H, get_register16(REG_H) - 1);
         return;
     }
 
     // Put value at address HL into A, inc HL
     if(m == 0x2A) {
-        set_register(REG_A, memory_read8(get_register16(REG_H)));
+        set_register8(REG_A, memory_read8(get_register16(REG_H)));
         set_register16(REG_H, get_register16(REG_H) + 1);
         return;
     }
@@ -480,5 +484,6 @@ uint8_t run () {
 
         parse_op();
         PC++;
+        usleep(100000);
     }
 }
