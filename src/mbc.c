@@ -181,8 +181,8 @@ uint8_t memory_write8 (uint16_t address, uint8_t value) {
 }
 
 uint8_t memory_write16 (uint16_t address, uint16_t value) {
-    memory_write8(address, value >> 8);
-    memory_write8(address + 1, value & 0xFF);
+    memory_write8(address, value & 0xFF);
+    memory_write8(address + 1, value >> 8);
     return 1;
 }
 
@@ -198,5 +198,5 @@ uint8_t memory_read8 (uint16_t address) {
 }
 
 uint16_t memory_read16 (uint16_t address) {
-    return memory_read8(address) << 8 | memory_read8(address + 1);
+    return memory_read8(address) | (memory_read8(address + 1) << 8);
 }
