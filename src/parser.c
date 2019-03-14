@@ -1,20 +1,27 @@
 #include "parser.h"
 #include <unistd.h>
-
+#include <stdio.h>
 
 void OP_LD8 ();
 void OP_LD16 ();
 
 void OP_ALU8 ();
+void OP_ALU16 ();
 
 uint8_t _half_carry16 (uint16_t a, uint16_t b);
 uint8_t _half_carry8 (uint8_t a, uint8_t b);
 uint8_t _half_carry_sub8 (uint8_t a, uint8_t b);
 uint8_t _carry16 (uint16_t a, uint16_t b);
 
+uint8_t rotate_right8 (uint8_t n, uint8_t d);
+uint8_t rotate_left8 (uint8_t n, uint8_t d);
+
 uint8_t parse_op () {
     uint8_t m = memory_read8(PC);
 
+    printf("Reading operation: 0x%2x\n", m);
+    print_registers();
+    printf("PC: 0x%2x\n", PC);
     // NO OPERATION
     if(m == 0x00) 
         return 1;
@@ -28,28 +35,446 @@ uint8_t parse_op () {
 
     // 8bit LOAD operations
     if(((m >= 0x40 && m <= 0x7F) && m != 0x76) || 
-        ((m & 0xF == 0x2 || m & 0xF == 0x6 || m & 0xF == 0xA || m & 0xF == 0xE) && m >> 4 <= 3) || 
+        (((m & 0xF) == 0x2 || (m & 0xF) == 0x6 || (m & 0xF) == 0xA || (m & 0xF) == 0xE) && ((m >> 4) <= 3)) || 
         m == 0xE0 || m == 0xF0 || m == 0xE2 || m == 0xF2 || m == 0xEA || m == 0xFA) {
+            printf("Going to 8bit Loads\n");
             OP_LD8();
             return 1;
     }
     // 16bit LOAD operations
-    if((m & 0x0F == 0x1 && (m >> 4 <= 0x3 || m >> 4 >= 0xC)) || (m & 0x0F == 0x5 && m >= 0xC) ||
+    if(((m & 0x0F) == 0x1 && ((m >> 4) <= 0x3 || (m >> 4) >= 0xC)) || ((m & 0x0F) == 0x5 && m >= 0xC) ||
         m == 0x08 || m == 0xF8 || m == 0xF9) {
-
+        printf("Going to 16bit Loads\n");
         OP_LD16();
         return 1;
     }
 
     // 8bit ALU
-    if((m >= 0x80 && m <= 0xBF) || ((m >> 4 <= 0x3) && (m & 0xF == 0x4 || m & 0xF == 0x5 || m & 0xF == 0xC || m & 0xF == 0xD))
-        || ((m >> 4 >= 0xC) && (m & 0xF == 0x7 || m & 0xF == 0xE)) || m == 0x27 || m == 0x37 || m == 0x2F || m == 0x3F) {
+    if((m >= 0x80 && m <= 0xBF) || (((m >> 4) <= 0x3) && ((m & 0xF) == 0x4 || (m & 0xF) == 0x5 || (m & 0xF) == 0xC || (m & 0xF) == 0xD))
+        || (((m >> 4) >= 0xC) && ((m & 0xF) == 0x6 || (m & 0xF) == 0xE)) || m == 0x27 || m == 0x37 || m == 0x2F || m == 0x3F) {
 
         OP_ALU8();
+        return 1;
+    }
+    // 16it ALU
+    if((((m & 0xF) == 0x3 || (m & 0xF) == 0x9 || (m & 0xF) == 0xB) && ((m >> 4) <= 0x3)) || m == 0xE8) {
+        OP_ALU16();
+        return 1;
     }
 
+    // RRCA
+    if(m == 0x0F) {
 
+        set_flag(FLAG_Z, get_register8(REG_A) == 0);
+        set_flag(FLAG_C, get_register8(REG_A) & 0x01);
+        set_flag(FLAG_N, 0);
+        set_flag(FLAG_H, 0);
+        set_register8(REG_A, rotate_right8(get_register8(REG_A), 1));
+        return 1;
+    }
+    // RRA
+    if(m == 0x0F) {
+
+        set_flag(FLAG_Z, get_register8(REG_A) == 0);
+        set_flag(FLAG_N, 0);
+        set_flag(FLAG_H, 0);
+        uint8_t c = get_flag(FLAG_C);
+        set_flag(FLAG_C, get_register8(REG_A) & 0x01);
+        set_register8(REG_A, (c << 7) | (get_register8(REG_A) >> 1));
+        return 1;
+    }
+
+    // JUMPS
+    // Jump to address
+    if(m == 0xC3) {
+        PC += 2;
+        uint16_t addr = memory_read16(PC - 1);
+        PC = addr - 1;
+        return 1;
+    }
+    // Jump to address nn if following condition is true
+    if(m == 0xC2) {
+        PC += 2;
+        uint16_t addr = memory_read16(PC - 1);
+        if(!get_flag(FLAG_Z)) {
+            PC = addr - 1;
+        }
+        return 1;
+    }
+    if(m == 0xCA) {
+        PC += 2;
+        uint16_t addr = memory_read16(PC - 1);
+        if(get_flag(FLAG_Z)) {
+            PC = addr - 1;
+        }
+        return 1;
+    }
+    if(m == 0xD2) {
+        PC += 2;
+        uint16_t addr = memory_read16(PC - 1);
+        if(!get_flag(FLAG_C)) {
+            PC = addr - 1;
+        }
+        return 1;
+    }
+    if(m == 0xDA) {
+        PC += 2;
+        uint16_t addr = memory_read16(PC - 1);
+        if(get_flag(FLAG_C)) {
+            PC = addr - 1;
+        }
+        return 1;
+    }
+    // JUMP HL
+    if(m == 0xE9) {
+        uint16_t addr = get_register16(REG_H);
+        PC = addr - 1;
+        return 1;
+    }
+    // Add n to current address and jump to it
+    if(m == 0x18) {
+        PC++;
+        uint16_t addr = PC - 1 + (int8_t)memory_read8(PC);
+        PC = addr - 1;
+        return 1;
+    }
+
+    // If following condition is true then add n and jump
+    if(m == 0x20) {
+        PC++;
+        if(!get_flag(FLAG_Z)) {
+            uint16_t addr = PC - 1 + (int8_t)memory_read8(PC);
+            PC = addr - 1;
+        }
+        return 1;
+    }
+    if(m == 0x28) {
+        PC++;
+        if(get_flag(FLAG_Z)) {
+            uint16_t addr = PC - 1 + (int8_t)memory_read8(PC);
+            PC = addr - 1;
+        }
+        return 1;
+    }
+    if(m == 0x30) {
+        PC++;
+        if(!get_flag(FLAG_C)) {
+            uint16_t addr = PC - 1 + (int8_t)memory_read8(PC);
+            PC = addr - 1;
+        }
+        return 1;
+    }
+    if(m == 0x38) {
+        PC++;
+        if(get_flag(FLAG_C)) {
+            uint16_t addr = PC - 1 + (int8_t)memory_read8(PC);
+            PC = addr - 1;
+        }
+        return 1;
+    }
+    // CALLS
+
+    // Push address of next instruction onto stack, jump to address nn
+    if(m == 0xCD) {
+        // Write PC to stack
+        memory_write16(SP - 2, PC + 3);
+        SP -= 2;
+
+        PC += 2;
+        uint16_t addr = memory_read16(PC - 1);
+        PC = addr - 1;
+        return 1;
+    }
+    // jump if flag
+    if(m == 0xC4) {
+        PC += 2;
+        uint16_t addr = memory_read16(PC - 1);
+        if(!get_flag(FLAG_Z)) {
+            // Write PC to stack
+            memory_write16(SP - 2, PC + 1);
+            SP -= 2;
+            PC = addr - 1;
+        }
+        return 1;
+    }
+    if(m == 0xCC) {
+        PC += 2;
+        uint16_t addr = memory_read16(PC - 1);
+        if(get_flag(FLAG_Z)) {
+            // Write PC to stack
+            memory_write16(SP - 2, PC + 1);
+            SP -= 2;
+            PC = addr - 1;
+        }
+        return 1;
+    }
+    if(m == 0xD4) {
+        PC += 2;
+        uint16_t addr = memory_read16(PC - 1);
+        if(!get_flag(FLAG_C)) {
+            // Write PC to stack
+            memory_write16(SP - 2, PC + 1);
+            SP -= 2;
+            PC = addr - 1;
+        }
+        return 1;
+    }
+    if(m == 0xDC) {
+        PC += 2;
+        uint16_t addr = memory_read16(PC - 1);
+        if(get_flag(FLAG_C)) {
+            // Write PC to stack
+            memory_write16(SP - 2, PC + 1);
+            SP -= 2;
+            PC = addr - 1;
+        }
+        return 1;
+    }
+
+    // RESTARTS
+    if((m >> 4) >= 0xC && ((m & 0xF) == 0x7 || (m & 0xF) == 0xF)) {
+        switch(m) {
+            case 0xC7:
+            {   
+                // NOTE: PC or PC + 1 ????
+                memory_write16(SP - 2, PC);
+                SP -= 2;
+                PC = 0 - 1;
+                break;
+            }
+            case 0xCF:
+            {   
+                // NOTE: PC or PC + 1 ????
+                memory_write16(SP - 2, PC);
+                SP -= 2;
+                PC = 0x8 - 1;
+                break;
+            }
+            case 0xD7:
+            {   
+                // NOTE: PC or PC + 1 ????
+                memory_write16(SP - 2, PC);
+                SP -= 2;
+                PC = 0x10 - 1;
+                break;
+            }
+            case 0xDF:
+            {   
+                // NOTE: PC or PC + 1 ????
+                memory_write16(SP - 2, PC);
+                SP -= 2;
+                PC = 0x18 - 1;
+                break;
+            }
+            case 0xE7:
+            {   
+                // NOTE: PC or PC + 1 ????
+                memory_write16(SP - 2, PC);
+                SP -= 2;
+                PC = 0x20 - 1;
+                break;
+            }
+            case 0xEF:
+            {   
+                // NOTE: PC or PC + 1 ????
+                memory_write16(SP - 2, PC);
+                SP -= 2;
+                PC = 0x28 - 1;
+                break;
+            }
+            case 0xF7:
+            {   
+                // NOTE: PC or PC + 1 ????
+                memory_write16(SP - 2, PC);
+                SP -= 2;
+                PC = 0x30 - 1;
+                break;
+            }
+            case 0xFF:
+            {   
+                // NOTE: PC or PC + 1 ????
+                memory_write16(SP - 2, PC);
+                SP -= 2;
+                PC = 0x38 - 1;
+                break;
+            }
+        }
+        return 1;
+    }
+
+    // RETURNS
+
+    // pop 2 from stack & jump
+    if(m == 0xC9) {
+        PC = memory_read16(SP) - 1;
+        memory_write16(SP, 0);
+        SP += 2;
+        return 1;
+    }
+
+    // pop 2 from stack & jump if flag
+    if(m == 0xC0) {
+        if(!get_flag(FLAG_Z)) {
+            PC = memory_read16(SP) - 1;
+            memory_write16(SP, 0);
+            SP += 2;
+        }
+        return 1;
+    }
+    if(m == 0xC8) {
+        if(get_flag(FLAG_Z)) {
+            PC = memory_read16(SP) - 1;
+            memory_write16(SP, 0);
+            SP += 2;
+        }
+        return 1;
+    }
+    if(m == 0xD0) {
+        if(!get_flag(FLAG_C)) {
+            PC = memory_read16(SP) - 1;
+            memory_write16(SP, 0);
+            SP += 2;
+        }
+        return 1;
+    }
+    if(m == 0xD8) {
+        if(get_flag(FLAG_C)) {
+            PC = memory_read16(SP) - 1;
+            memory_write16(SP, 0);
+            SP += 2;
+        }
+        return 1;
+    }
+
+    // RETurn and enable INT
+    if(m == 0xD9) {
+        PC = memory_read16(SP) - 1;
+        memory_write16(SP, 0);
+        SP += 2;
+        interrupt_enable = 1;
+        return 1;
+    }
+
+    // Disable Interrupt
+    if(m == 0xF3) {
+        interrupt_enable = 0;
+        return 1;
+    }
+    // Enable interrupt
+    if(m == 0xFB) {
+        interrupt_enable = 1;
+        return 1;
+    }
+
+    printf("THIS OPCODE IS UNKNOWN!!!!\n");
     return 0;
+}
+
+
+void OP_ALU16 () {
+    uint8_t m = memory_read8(PC);
+    uint16_t hl = get_register16(REG_H);
+    switch(m) {
+        // ADD hl, n
+        case 0x09:
+        {
+            uint32_t res = hl + get_register16(REG_B);
+            set_flag(FLAG_N, 0);
+            set_flag(FLAG_H, _half_carry16(hl, get_register16(REG_B)));
+            set_flag(FLAG_C, res > 0xFFFF);
+            set_register16(REG_H, res);
+            break;
+        }
+        case 0x19:
+        {
+            uint32_t res = hl + get_register16(REG_D);
+            set_flag(FLAG_N, 0);
+            set_flag(FLAG_H, _half_carry16(hl, get_register16(REG_D)));
+            set_flag(FLAG_C, res > 0xFFFF);
+            set_register16(REG_H, res);
+            break;
+        }
+        case 0x29:
+        {
+            uint32_t res = hl + get_register16(REG_H);
+            set_flag(FLAG_N, 0);
+            set_flag(FLAG_H, _half_carry16(hl, get_register16(REG_H)));
+            set_flag(FLAG_C, res > 0xFFFF);
+            set_register16(REG_H, res);
+            break;
+        }
+        case 0x39:
+        {
+            uint32_t res = hl + SP;
+            set_flag(FLAG_N, 0);
+            set_flag(FLAG_H, _half_carry16(hl, SP));
+            set_flag(FLAG_C, res > 0xFFFF);
+            set_register16(REG_H, res);
+            break;
+        }
+        // ADD sp,n
+        case 0xE8:
+        {
+            PC++;
+            uint32_t res = memory_read8(PC) + SP;
+            set_flag(FLAG_N, 0);
+            set_flag(FLAG_Z, 0);
+            set_flag(FLAG_H, _half_carry16(memory_read8(PC), SP));
+            set_flag(FLAG_C, res > 0xFFFF);
+            set_register16(REG_H, res);
+            break;
+        }
+        // INC nn
+        case 0x03:
+        {
+            uint32_t res = get_register16(REG_B) + 1;
+            set_register16(REG_H, res);
+            break;
+        }
+        case 0x13:
+        {
+            uint32_t res = get_register16(REG_D) + 1;
+            set_register16(REG_H, res);
+            break;
+        }
+        case 0x23:
+        {
+            uint32_t res = get_register16(REG_H) + 1;
+            set_register16(REG_H, res);
+            break;
+        }
+        case 0x33:
+        {
+            uint32_t res = SP + 1;
+            set_register16(REG_H, res);
+            break;
+        }
+        // DEC nn
+        case 0x0B:
+        {
+            uint32_t res = get_register16(REG_B) - 1;
+            set_register16(REG_H, res);
+            break;
+        }
+        case 0x1B:
+        {
+            uint32_t res = get_register16(REG_D) - 1;
+            set_register16(REG_H, res);
+            break;
+        }
+        case 0x2B:
+        {
+            uint32_t res = get_register16(REG_H) - 1;
+            set_register16(REG_H, res);
+            break;
+        }
+        case 0x3B:
+        {
+            uint32_t res = SP - 1;
+            set_register16(REG_H, res);
+            break;
+        }
+    }
 }
 
 void OP_ALU8 () {
@@ -365,7 +790,7 @@ void OP_ALU8 () {
     }
 
     // INC n
-    if(((m >= 0x04 && m <= 0x3C) && (m & 0xF == 0xC || m & 0xF == 0x4))) {
+    if(((m >= 0x04 && m <= 0x3C) && ((m & 0xF) == 0xC || (m & 0xF) == 0x4))) {
         switch(m) {
             case 0x3C:
             {
@@ -443,7 +868,7 @@ void OP_ALU8 () {
         return;
     }
     // DEC n
-    if(((m >= 0x05 && m <= 0x3D) && (m & 0xF == 0xD || m & 0xF == 0x5))) {
+    if(((m >= 0x05 && m <= 0x3D) && ((m & 0xF) == 0xD || (m & 0xF) == 0x5))) {
         switch(m) {
             case 0x3D:
             {
@@ -525,7 +950,7 @@ void OP_ALU8 () {
 
 void OP_LD16 () {
     uint8_t m = memory_read8(PC);
-    if(m >> 4 <= 0x3 && (m & 0xF == 0x1)) {
+    if(m >> 4 <= 0x3 && ((m & 0xF) == 0x1)) {
         // Put value nn into n
         PC += 2;
         switch(m) {
@@ -576,7 +1001,7 @@ void OP_LD16 () {
         return;
     }
 
-    if(m >> 4 >= 0xC && m & 0xF == 0x5) {
+    if(m >> 4 >= 0xC && (m & 0xF) == 0x5) {
         // PUSH nn
         switch(m) {
             case 0xF5:
@@ -607,7 +1032,7 @@ void OP_LD16 () {
 
         return;
     }
-    if(m >> 4 >= 0xC && m & 0xF == 0x1) {
+    if(m >> 4 >= 0xC && (m & 0xF) == 0x1) {
         // POP nn
         switch(m) {
             case 0xF1:
@@ -650,7 +1075,7 @@ void OP_LD8 () {
     uint8_t m = memory_read8(PC);
 
     // put value nn into n
-    if((m >= 0x06 && m <= 0x2E) && (m & 0xF == 0x6 || m & 0xF == 0xE)) {
+    if((m >= 0x06 && m <= 0x2E) && ((m & 0xF) == 0x6 || (m & 0xF) == 0xE)) {
         PC++;
         switch(m) {
             case 0x6:
@@ -825,7 +1250,7 @@ void OP_LD8 () {
     }
 
     // put value A into nn
-    if(((m >= 0x47 && m <= 0x7F) && (m & 0xF == 0xF || m & 0xF == 0x7)) || m == 0x02 || m == 0x12 || m == 0xEA) {
+    if(((m >= 0x47 && m <= 0x7F) && ((m & 0xF) == 0xF || (m & 0xF) == 0x7)) || m == 0x02 || m == 0x12 || m == 0xEA) {
         switch(m) {
             case 0x7F:
             {
@@ -932,30 +1357,32 @@ void OP_LD8 () {
     }
 
     // Put value A at address HL, inc HL
-    if(m == 0x32) {
+    if(m == 0x2A) {
         memory_write8(get_register16(REG_H), get_register8(REG_A));
         set_register16(REG_H, get_register16(REG_H) + 1);
         return;
     }
 
     // Put value A to $FF00 + n
-    if(m == 0x32) {
+    if(m == 0xE0) {
         PC++;
         memory_write8(0xFF00 + memory_read8(PC), get_register8(REG_A));
         return;
     }
 
     // Put value $FF00 + n to A
-    if(m == 0x32) {
+    if(m == 0xF0) {
         PC++;
         set_register8(REG_A, memory_read8(0xFF00 + memory_read8(PC)));
         return;
     }
 
+
+    printf("*************OP8 missed!!!\n");
 }
 
 uint8_t _half_carry16 (uint16_t a, uint16_t b) {
-    return (((a & 0xf) + (b & 0xf)) & 0x10) == 0x10;
+    return ((((a >> 8) & 0xf) + ((b >> 8) & 0xf)) & 0x10) == 0x10;
 }
 
 uint8_t _half_carry8 (uint8_t a, uint8_t b) {
@@ -970,11 +1397,19 @@ uint8_t _carry16 (uint16_t a, uint16_t b) {
     return ((uint32_t)a + (uint32_t)b > 0xFFFF);
 }
 
+uint8_t rotate_right8 (uint8_t n, uint8_t d) { 
+    return (n >> d)|(n << (8 - d)); 
+} 
+
+uint8_t rotate_left8 (uint8_t n, uint8_t d) { 
+    return (n << d)|(n >> (8 - d)); 
+} 
+
 uint8_t run () {
     while(1) {
 
         parse_op();
         PC++;
-        usleep(100000);
+        getchar();
     }
 }

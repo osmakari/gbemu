@@ -7,6 +7,8 @@ uint16_t _registers[4] = { 0 };
 uint16_t SP = 0xFFFE;
 uint16_t PC = 0x100;
 
+uint8_t interrupt_enable = 1;
+
 
 void set_bit (uint8_t *a, uint8_t index, uint8_t state) {
     if(state == 0) {
@@ -28,7 +30,7 @@ void set_bit16 (uint16_t *a, uint8_t index, uint8_t state) {
 
 uint8_t set_register8 (enum L_REGISTER reg, uint8_t value) {
     uint16_t mask = (reg % 2 == 0 ? 0xFF00 : 0x00FF);
-    _registers[reg/2] = (_registers[reg/2] & ~mask) | ((uint16_t)value & mask);
+    _registers[reg/2] = (_registers[reg/2] & ~mask) | (((uint16_t)value << (reg % 2 == 0 ? 8 : 0)) & mask);
     return 1;
 }
 
@@ -43,7 +45,7 @@ uint8_t set_flag (enum L_FLAG flag, uint8_t state) {
 }
 
 uint8_t get_register8 (enum L_REGISTER reg) {
-    return _registers[reg/2] >> (reg % 2 == 0 ? 8 : 0);
+    return (_registers[reg/2] >> ((reg % 2) == 0 ? 8 : 0)) & 0xFF;
 }
 
 uint8_t get_register16 (enum L_REGISTER reg) {

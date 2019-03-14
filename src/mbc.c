@@ -136,6 +136,7 @@ uint8_t memory_write8 (uint16_t address, uint8_t value) {
     else if(memory_mode == MM_MBC1) {
         // Controller operations
         if(address >= 0x6000 && address <= 0x7FFF) {
+            printf("Changing MAX MEMORY MODE to: %i\n", value & 0x01);
             // Change max memory mode
             if(value & 0x01 == 1) {
                 // 4Mbit ROM/32KB ram mode
@@ -152,6 +153,8 @@ uint8_t memory_write8 (uint16_t address, uint8_t value) {
             memory_bank = value & 0b00011111;
             if(memory_bank == 0)
                 memory_bank = 1;
+
+            printf("Setting memory bank to: 0x%2x\n", memory_bank);
             return 1;
         }
 
@@ -171,7 +174,9 @@ uint8_t memory_write8 (uint16_t address, uint8_t value) {
                 return 1;
             }
         }
-
+        if(address >= 0xFF40 && address <= 0xFF4B) {
+            printf("SCREEN WRITE************\n");
+        }
         // Actual memory write...
         memory[address] = value;
         return 1;

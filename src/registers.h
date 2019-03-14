@@ -32,6 +32,8 @@ extern uint16_t PC;
 
 extern uint8_t MODE_STOP;
 
+extern uint8_t interrupt_enable;
+
 
 // Register functions
 
