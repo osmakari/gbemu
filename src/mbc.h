@@ -28,6 +28,8 @@ extern uint8_t ram_size;
 // External Ram in cartridge
 extern uint8_t *ext_ram;
 
+extern uint8_t booting;
+
 // MEMORY
 
 extern uint8_t memory[0xFFFF];

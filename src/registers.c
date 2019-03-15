@@ -5,7 +5,7 @@
 uint16_t _registers[4] = { 0 };
 
 uint16_t SP = 0xFFFE;
-uint16_t PC = 0x100;
+uint16_t PC = 0x0;
 
 uint8_t interrupt_enable = 1;
 
@@ -48,7 +48,7 @@ uint8_t get_register8 (enum L_REGISTER reg) {
     return (_registers[reg/2] >> ((reg % 2) == 0 ? 8 : 0)) & 0xFF;
 }
 
-uint8_t get_register16 (enum L_REGISTER reg) {
+uint16_t get_register16 (enum L_REGISTER reg) {
     return _registers[reg/2];
 }
 

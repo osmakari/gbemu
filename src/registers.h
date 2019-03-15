@@ -49,7 +49,7 @@ uint8_t set_flag (enum L_FLAG flag, uint8_t state);
 
 uint8_t get_register8 (enum L_REGISTER reg);
 
-uint8_t get_register16 (enum L_REGISTER reg);
+uint16_t get_register16 (enum L_REGISTER reg);
 
 uint8_t get_flag (enum L_FLAG flag);
 
