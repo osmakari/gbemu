@@ -38,8 +38,6 @@ struct windri *window_init (unsigned int width, unsigned int height, const char 
     window->window_width = width;
     window->window_height = height;
 
-    unsigned long black, white;
-
 	window->display = XOpenDisplay((char *)0);
    	window->screen = DefaultScreen(window->display);
 

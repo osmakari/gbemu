@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "disp.h"
+#include "registers.h"
 /*
     MEMORY CONTROLLER
 */
@@ -40,7 +41,7 @@ Echo of 8kB Internal RAM
 
 uint8_t max_memory_mode = 0;
 
-uint8_t memory_bank = 0;
+uint8_t memory_bank = 1;
 
 uint8_t ram_bank = 0;
 
@@ -60,7 +61,7 @@ uint8_t booting = 1;
 
 uint8_t boot_program[0x100] = { 
 	0x31, 0xfe, 0xff, 0xaf, 0x21, 0xff, 0x9f, 0x32, 
-	0xcb, 0x45, 0x20, 0xfb, 0x21, 0x26, 0xff, 0x0e, 
+	0xcb, 0x7c, 0x20, 0xfb, 0x21, 0x26, 0xff, 0x0e, 
 	0x11, 0x3e, 0x80, 0x32, 0xe2, 0x0c, 0x3e, 0xf3, 
 	0xe2, 0x32, 0x3e, 0x77, 0x77, 0x3e, 0xfc, 0xe0, 
 	0x47, 0x11, 0x04, 0x01, 0x21, 0x10, 0x80, 0x1a, 
@@ -90,7 +91,7 @@ uint8_t boot_program[0x100] = {
 	0x21, 0x04, 0x01, 0x11, 0xa8, 0x00, 0x1a, 0x13, 
 	0xbe, 0x20, 0xfe, 0x23, 0x7d, 0xfe, 0x34, 0x20, 
 	0xf5, 0x06, 0x19, 0x78, 0x86, 0x23, 0x05, 0x20, 
-	0xfb, 0x86, 0x20, 0xfe, 0x3e, 0x01, 0xe0, 0x50
+	0xfb, 0x86, 0x00, 0x00, 0x3e, 0x01, 0xe0, 0x50
 };
 
 
@@ -107,10 +108,12 @@ uint8_t rom_load (const char *file) {
         fread(_rsz, 1, 4, pFile);
         if(_rsz[1] == 0) {
             memory_mode = MM_ROM_ONLY;
+            
         }
         else if(_rsz[1] == 1) {
             memory_mode = MM_MBC1;
         }
+        printf("MEMORY MODE: 0x%x\n", memory_mode);
         rom_size = _rsz[2];
         ram_size = _rsz[3];
 
@@ -156,7 +159,12 @@ uint8_t rom_load (const char *file) {
         fread(cartridge, 1, cartridge_size, pFile);
 
         memcpy(memory, cartridge, 0x4000);
-
+        uint8_t t = 0x19;
+        for(int x = 0x134; x < 0x14D; x++) {
+            t += memory[x];
+        }
+        printf("CHECK: %i\n", t);
+        //exit(0);
         return 1;
     }
     else {
@@ -191,7 +199,8 @@ uint8_t memory_write8 (uint16_t address, uint8_t value) {
             if(memory_bank == 0)
                 memory_bank = 1;
 
-            printf("Setting memory bank to: 0x%2x\n", memory_bank);
+            printf("Setting memory bank to: 0x%2x AT PC: 0x%x\n", memory_bank, PC - 1);
+            
             return 1;
         }
 
@@ -214,11 +223,28 @@ uint8_t memory_write8 (uint16_t address, uint8_t value) {
         if(address >= 0xFF40 && address <= 0xFF4B) {
             screen_register_write(address, value);
         }
+        if(address == 0xFF50) {
+            if(value)
+                booting = 0;
+            else
+                booting = 1;
+        }
+
+        if(address >= 0xE000 && address <= 0xFDFF) {
+            memory[(address - 0xE000) + 0xFF80] = value;
+            return 1;
+        }
+
         if(address >= 0xFE00 && address <= 0xFE9F) {
             printf("Writing to OAM at 0x%x value 0x%x\n", address, value);
         }
+        if(address >= 0x9800 && address <= 0x9BFF) {
+            // Writing to Tile map #1
+            //printf("Writing to tilemap: Y %i X %i\n", (address - 0x9800)/32, (address - 0x9800) % 32);
+            tilemap[(address - 0x9800)/32][(address - 0x9800) % 32] = value;
+        }
         if(address >= 0x8000 && address <= 0x9FFF) {
-            printf("Writing to VRAM at 0x%x value 0x%x\n", address, value);
+            //printf("Writing to VRAM at 0x%x value 0x%x\n", address, value);
         }
         // Actual memory write...
         memory[address] = value;
@@ -244,6 +270,10 @@ uint8_t memory_read8 (uint16_t address) {
     }
     else if(address >= 0xA000 && address <= 0xBFFF) {
         return ext_ram[0xA000 + (0x2000 * ram_bank) + (address - 0xA000)];
+    }
+
+    if(address >= 0xE000 && address <= 0xFDFF) {
+        return memory[(address - 0xE000) + 0xFF80];
     }
 
     if(address >= 0xFF40 && address <= 0xFF4B) {

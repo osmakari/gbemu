@@ -37,6 +37,8 @@ struct windri {
     int window_height;
 };
 
+unsigned long black, white;
+
 struct windri *window_init (unsigned int width, unsigned int height, const char *title);
 void window_update ();
 int window_close (struct windri *w);

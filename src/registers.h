@@ -54,3 +54,5 @@ uint16_t get_register16 (enum L_REGISTER reg);
 uint8_t get_flag (enum L_FLAG flag);
 
 void print_registers ();
+
+void set_bit (uint8_t *a, uint8_t index, uint8_t state);

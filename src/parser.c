@@ -22,12 +22,25 @@ void OP_BITOP8 ();
 
 struct timeval start;
 
+uint16_t last_sp = 0;
+
 uint8_t parse_op () {
     uint8_t m = memory_read8(PC);
 
-    printf("Reading operation: 0x%2x\n", m);
-    print_registers();
-    printf("PC: 0x%2x\n", PC);
+    //printf("Reading operation: 0x%2x\n", m);
+    //print_registers();
+    //if(last_sp != SP) {
+        printf("PC: 0x%2x, M: 0x%2x\n", PC, m);
+    //    printf("SP CHANGED FROM 0x%x to 0x%x\n", last_sp, SP);
+    //    last_sp = SP;
+    //}
+    
+    //printf("VERT: 0x%2x\n", memory[0xFF44]);
+    
+    if(PC >= 0x27 && PC <= 0x30) {
+        printf("DE: 0x%x\n", get_register16(REG_D));
+    }
+
     // NO OPERATION
     if(m == 0x00) 
         return 1;
@@ -48,14 +61,14 @@ uint8_t parse_op () {
     if(((m >= 0x40 && m <= 0x7F) && m != 0x76) || 
         (((m & 0xF) == 0x2 || (m & 0xF) == 0x6 || (m & 0xF) == 0xA || (m & 0xF) == 0xE) && ((m >> 4) <= 3)) || 
         m == 0xE0 || m == 0xF0 || m == 0xE2 || m == 0xF2 || m == 0xEA || m == 0xFA) {
-            printf("Going to 8bit Loads\n");
+            //printf("Going to 8bit Loads\n");
             OP_LD8();
             return 1;
     }
     // 16bit LOAD operations
-    if(((m & 0x0F) == 0x1 && ((m >> 4) <= 0x3 || (m >> 4) >= 0xC)) || ((m & 0x0F) == 0x5 && m >= 0xC) ||
+    if(((m & 0x0F) == 0x1 && ((m >> 4) <= 0x3 || (m >> 4) >= 0xC)) || ((m & 0x0F) == 0x5 && (m >> 4) >= 0xC) ||
         m == 0x08 || m == 0xF8 || m == 0xF9) {
-        printf("Going to 16bit Loads\n");
+        //printf("Going to 16bit Loads\n");
         OP_LD16();
         return 1;
     }
@@ -495,13 +508,13 @@ void OP_ALU16 () {
         case 0x0B:
         {
             uint32_t res = get_register16(REG_B) - 1;
-            set_register16(REG_H, res);
+            set_register16(REG_B, res);
             return;
         }
         case 0x1B:
         {
             uint32_t res = get_register16(REG_D) - 1;
-            set_register16(REG_H, res);
+            set_register16(REG_D, res);
             return;
         }
         case 0x2B:
@@ -512,8 +525,7 @@ void OP_ALU16 () {
         }
         case 0x3B:
         {
-            uint32_t res = SP - 1;
-            set_register16(REG_H, res);
+            SP--;
             return;
         }
     }
@@ -1052,7 +1064,7 @@ void OP_LD16 () {
     if(m == 0x08) {
         // Put stack pointer at address n
         PC += 2;
-        memory_write16(PC - 1, SP);
+        memory_write16(memory_read16(PC - 1), SP);
         return;
     }
 
@@ -1099,6 +1111,7 @@ void OP_LD16 () {
             }
             case 0xC1:
             {
+                printf("SP: 0x%x\n", SP);
                 set_register16(REG_B, memory_read16(SP));
                 memory_write16(SP, 0);
                 SP += 2;
@@ -1113,6 +1126,8 @@ void OP_LD16 () {
             }
             case 0xE1:
             {
+
+                printf("SP: 0x%x\n", SP);
                 set_register16(REG_H, memory_read16(SP));
                 memory_write16(SP, 0);
                 SP += 2;
@@ -1122,7 +1137,7 @@ void OP_LD16 () {
 
         return;
     }
-    printf("O16 MISSED\n");
+    printf("O16 MISSED 0x%x\n", PC);
 
 }
 
@@ -1277,6 +1292,8 @@ void OP_LD8 () {
             {
                 // (DE) to A
                 set_register8(REG_A, memory_read8(get_register16(REG_D)));
+                if(PC >= 0x27 && PC <= 0x2F)
+                    printf("setting REG A (%x) TO %x, REG DE(%x)\n", get_register8(REG_A), memory_read8(get_register16(REG_D)), get_register16(REG_D));
                 break;
             }
             case 0x7E:
@@ -1509,11 +1526,11 @@ void OP_BITOP8 () {
             
         }
         if(m >= 0x08 && m <= 0x0D) {
-            set_flag(FLAG_Z, get_register8(m + REG_B) == 0);
-            set_flag(FLAG_C, (get_register8(m + REG_B)) & 0x01);
+            set_flag(FLAG_Z, get_register8(m - 0x08 + REG_B) == 0);
+            set_flag(FLAG_C, (get_register8(m - 0x08 + REG_B)) & 0x01);
             set_flag(FLAG_N, 0);
             set_flag(FLAG_H, 0);
-            set_register8(REG_A, rotate_right8(get_register8(m + REG_B), 1));
+            set_register8(REG_A, rotate_right8(get_register8(m - 0x08 + REG_B), 1));
         }
         if(m == 0x0E) {
             set_flag(FLAG_Z, memory_read8(get_register16(REG_H)) == 0);
@@ -1534,7 +1551,7 @@ void OP_BITOP8 () {
             set_flag(FLAG_H, 0);
             uint8_t c = get_flag(FLAG_C);
             set_flag(FLAG_C, (get_register8(REG_A) >> 7) & 0x01);
-            set_register8(REG_A, (c & 0x1) | (get_register8(REG_A) << 1));
+            set_register8(REG_A, (get_register8(REG_A) << 1) | (c & 0x1));
             set_flag(FLAG_Z, get_register8(REG_A) == 0);
             
         }
@@ -1542,9 +1559,9 @@ void OP_BITOP8 () {
             set_flag(FLAG_N, 0);
             set_flag(FLAG_H, 0);
             uint8_t c = get_flag(FLAG_C);
-            set_flag(FLAG_C, (get_register8(m + REG_B) >> 7) & 0x01);
-            set_register8(REG_A, (c & 0x1) | (get_register8(m + REG_B) << 1));
-            set_flag(FLAG_Z, get_register8(m + REG_B) == 0);
+            set_flag(FLAG_C, (get_register8(m - 0x10 + REG_B) >> 7) & 0x01);
+            set_register8(m - 0x10 + REG_B, (c & 0x1) | (get_register8(m - 0x10 + REG_B) << 1));
+            set_flag(FLAG_Z, get_register8(m - 0x10 + REG_B) == 0);
         }
         if(m == 0x16) {
             set_flag(FLAG_N, 0);
@@ -1573,9 +1590,9 @@ void OP_BITOP8 () {
             set_flag(FLAG_N, 0);
             set_flag(FLAG_H, 0);
             uint8_t c = get_flag(FLAG_C);
-            set_flag(FLAG_C, (get_register8(m + REG_B)) & 0x01);
-            set_register8(REG_A, (c << 7) | (get_register8(m + REG_B) >> 1));
-            set_flag(FLAG_Z, get_register8(m + REG_B) == 0);
+            set_flag(FLAG_C, (get_register8(m - 0x18 + REG_B)) & 0x01);
+            set_register8(m - 0x18 + REG_B, (c << 7) | (get_register8(m - 0x18 + REG_B) >> 1));
+            set_flag(FLAG_Z, get_register8(m - 0x18 + REG_B) == 0);
         }
         if(m == 0x1E) {
             set_flag(FLAG_N, 0);
@@ -1605,8 +1622,33 @@ void OP_BITOP8 () {
         else {
             v = get_register8(((m - 0x40) % 8) + REG_B);
         }
-        printf("BIT %i OF REGISTER %i SET FLAG Z: %i\n", offst, ((m - 0x40) % 8) + REG_B, ((v >> offst) & 0x01) == 0);
+        //printf("BIT %i OF REGISTER %i SET FLAG Z: %i\n", offst, ((m - 0x40) % 8) + REG_B, ((v >> offst) & 0x01) == 0);
         set_flag(FLAG_Z, ((v >> offst) & 0x01) == 0);
+
+        return;
+    }
+
+    // RES
+    if(m >= 0x80 && m <= 0xBF) {
+        uint8_t offst = (m - 0x80)/8;
+        uint8_t v;
+        if(((m - 0x80) % 8) + REG_B > REG_L) {
+            if(((m - 0x80) % 8) + REG_B == 8) {
+                v = memory_read8(get_register16(REG_H));
+                v &= ~(1UL << offst);
+                memory_write8(get_register16(REG_H), v);
+            }
+            else if(((m - 0x80) % 8) + REG_B == 9) {
+                v = get_register8(REG_A);
+                v &= ~(1UL << offst);
+                memory_write8(get_register16(REG_A), v);
+            }
+        }
+        else {
+            v = get_register8(((m - 0x80) % 8) + REG_B);
+            v &= ~(1UL << offst);
+            memory_write8(((m - 0x80) % 8) + REG_B, v);
+        }
 
         return;
     }
@@ -1625,7 +1667,7 @@ void OP_BITOP8 () {
     }
     */
 
-    printf("UNKNOWN CB\n");
+    printf("UNKNOWN CB %x\n", m);
     
 }
 
@@ -1655,19 +1697,39 @@ uint8_t rotate_left8 (uint8_t n, uint8_t d) {
 
 int vblank_c = 0;
 
-unsigned long last_vsync = 0;
+unsigned long last_vblank = 0;
+
+struct timespec t;
+struct timespec t2;
+
+uint8_t debugmode = 1;
 
 uint8_t run () {
+    window_update(w);
+    gettimeofday(&start, NULL);
+    t.tv_sec = 0;
+    t.tv_nsec = 500;
     while(1) {
-        gettimeofday(&start, NULL);
-        window_update(w);
+        if(PC == 0x100)
+            debugmode = 1;
+
+        if(debugmode) {
+            print_registers();
+            //getchar();
+
+        }
+        //nanosleep(&t, &t2);
+        for(int x = 0; x < 0x5FF; x++);
         parse_op();
         PC++;
-        getchar();
-        //if(start.tv_usec > last_vsync + (unsigned long)((double)(1 / 59.73) * 1000 * 1000)) {
-        //    last_vsync = start.tv_usec;
-            disp_vblank();
-        //}
-        usleep(1);
+        //getchar();
+        //usleep(1);
+        if(vblank_c >= 110) {
+            disp_worker();
+            vblank_c = 0;
+        }
+        vblank_c++;
+        last_vblank = 0;
+        
     }
 }
