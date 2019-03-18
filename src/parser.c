@@ -30,7 +30,7 @@ uint8_t parse_op () {
     //printf("Reading operation: 0x%2x\n", m);
     //print_registers();
     //if(last_sp != SP) {
-        printf("PC: 0x%2x, M: 0x%2x\n", PC, m);
+        //printf("PC: 0x%2x, M: 0x%2x\n", PC, m);
     //    printf("SP CHANGED FROM 0x%x to 0x%x\n", last_sp, SP);
     //    last_sp = SP;
     //}
@@ -38,7 +38,7 @@ uint8_t parse_op () {
     //printf("VERT: 0x%2x\n", memory[0xFF44]);
     
     if(PC >= 0x27 && PC <= 0x30) {
-        printf("DE: 0x%x\n", get_register16(REG_D));
+        //printf("DE: 0x%x\n", get_register16(REG_D));
     }
 
     // NO OPERATION
@@ -53,7 +53,8 @@ uint8_t parse_op () {
     }
 
     if(m == 0x76) {
-        printf("HALT HALT HALT!!!!\n");
+        printf("HALT HALT HALT!!!! int status %i\n", interrupt_enable);
+        MODE_STOP = 2;
         return 1;
     }
 
@@ -1111,7 +1112,6 @@ void OP_LD16 () {
             }
             case 0xC1:
             {
-                printf("SP: 0x%x\n", SP);
                 set_register16(REG_B, memory_read16(SP));
                 memory_write16(SP, 0);
                 SP += 2;
@@ -1127,7 +1127,6 @@ void OP_LD16 () {
             case 0xE1:
             {
 
-                printf("SP: 0x%x\n", SP);
                 set_register16(REG_H, memory_read16(SP));
                 memory_write16(SP, 0);
                 SP += 2;
@@ -1292,8 +1291,6 @@ void OP_LD8 () {
             {
                 // (DE) to A
                 set_register8(REG_A, memory_read8(get_register16(REG_D)));
-                if(PC >= 0x27 && PC <= 0x2F)
-                    printf("setting REG A (%x) TO %x, REG DE(%x)\n", get_register8(REG_A), memory_read8(get_register16(REG_D)), get_register16(REG_D));
                 break;
             }
             case 0x7E:
@@ -1710,26 +1707,37 @@ uint8_t run () {
     t.tv_sec = 0;
     t.tv_nsec = 500;
     while(1) {
-        if(PC == 0x100)
-            debugmode = 1;
+            //printf("********************PC: 0x%2x, M: 0x%2x\n", PC, 0);
 
+        //print_registers();
         if(debugmode) {
-            print_registers();
+            
             //getchar();
 
         }
         //nanosleep(&t, &t2);
-        for(int x = 0; x < 0x5FF; x++);
-        parse_op();
-        PC++;
+        for(int x = 0; x < 0x8FF; x++);
+
+        if(MODE_STOP == 1)
+            continue;
+        printf("PC: 0x%x\n", PC);
+        // No processor updates when in MODE 2 (HALT)
+        if(MODE_STOP == 0) {
+            parse_op();
+            PC++;
+            clocks += 4;
+        }
         //getchar();
         //usleep(1);
-        if(vblank_c >= 110) {
+        display_update();
+        /*
+        if(vblank_c >= 310) {
             disp_worker();
             vblank_c = 0;
         }
         vblank_c++;
         last_vblank = 0;
+        */
         
     }
 }

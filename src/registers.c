@@ -9,6 +9,7 @@ uint16_t PC = 0x0;
 
 uint8_t interrupt_enable = 1;
 
+unsigned long clocks = 0;
 
 void set_bit (uint8_t *a, uint8_t index, uint8_t state) {
     if(state == 0) {
@@ -64,4 +65,5 @@ void print_registers () {
 
 
 // Stop mode
+// 0: Normal, 1: STOP, 2: HALT
 uint8_t MODE_STOP = 0;

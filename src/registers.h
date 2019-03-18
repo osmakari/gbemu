@@ -34,6 +34,7 @@ extern uint8_t MODE_STOP;
 
 extern uint8_t interrupt_enable;
 
+extern unsigned long clocks;
 
 // Register functions
 

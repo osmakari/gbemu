@@ -43,7 +43,7 @@ uint8_t max_memory_mode = 0;
 
 uint8_t memory_bank = 1;
 
-uint8_t ram_bank = 0;
+uint8_t ram_bank = 1;
 
 // Memory buffer for cartridge
 uint8_t *cartridge;
@@ -220,38 +220,40 @@ uint8_t memory_write8 (uint16_t address, uint8_t value) {
                 return 1;
             }
         }
-        if(address >= 0xFF40 && address <= 0xFF4B) {
-            screen_register_write(address, value);
-        }
-        if(address == 0xFF50) {
-            if(value)
-                booting = 0;
-            else
-                booting = 1;
-        }
-
-        if(address >= 0xE000 && address <= 0xFDFF) {
-            memory[(address - 0xE000) + 0xFF80] = value;
-            return 1;
-        }
-
-        if(address >= 0xFE00 && address <= 0xFE9F) {
-            printf("Writing to OAM at 0x%x value 0x%x\n", address, value);
-        }
-        if(address >= 0x9800 && address <= 0x9BFF) {
-            // Writing to Tile map #1
-            //printf("Writing to tilemap: Y %i X %i\n", (address - 0x9800)/32, (address - 0x9800) % 32);
-            tilemap[(address - 0x9800)/32][(address - 0x9800) % 32] = value;
-        }
-        if(address >= 0x8000 && address <= 0x9FFF) {
-            //printf("Writing to VRAM at 0x%x value 0x%x\n", address, value);
-        }
-        // Actual memory write...
-        memory[address] = value;
-        return 1;
+        
+        
         
     }
-    return 0;
+    if(address >= 0xFF40 && address <= 0xFF4B) {
+        screen_register_write(address, value);
+    }
+    if(address == 0xFF50) {
+        if(value)
+            booting = 0;
+        else
+            booting = 1;
+    }
+
+    if(address >= 0xE000 && address <= 0xFDFF) {
+        memory[(address - 0xE000) + 0xFF80] = value;
+        return 1;
+    }
+
+    // Actual memory write...
+    memory[address] = value;
+    if(address >= 0xFE00 && address <= 0xFE9F) {
+        printf("Writing to OAM at 0x%x value 0x%x\n", address, value);
+    }
+    if(address >= 0x9800 && address <= 0x9BFF) {
+        // Writing to Tile map #1
+        printf("Writing to tilemap:  %x, %x\n", (address), value);
+        tilemap[(address - 0x9800)/32][(address - 0x9800) % 32] = value;
+    }
+    if(address >= 0x8000 && address <= 0x9FFF) {
+        //printf("Writing to VRAM at 0x%x value 0x%x\n", address, value);
+    }
+
+    return 1;
 }
 
 uint8_t memory_write16 (uint16_t address, uint16_t value) {
